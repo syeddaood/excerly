@@ -171,3 +171,25 @@ A working Android app meeting build steps 1–5.
 A working iOS app meeting build steps 6–7.
 A written report on the OEM battery-optimization onboarding: which manufacturers were tested, which deep links work, and the measured drop-off at each permission step.
 Documentation of the Family Controls entitlement request status and, if denied, the reasoning.
+
+## How to Reclone This Repository
+
+If you need to reclone this repository, follow these steps:
+
+1. **Navigate to the directory** where you want to clone the repository.
+2. **Remove the existing repository** (if necessary) by deleting its directory:
+   ```bash
+   rm -rf excerly
+   ```
+3. **Clone the repository** using the following command:
+   ```bash
+   git clone <repository-url>
+   ```
+   Replace `<repository-url>` with the actual URL of the repository.
+
+4. **Navigate into the cloned directory**:
+   ```bash
+   cd excerly
+   ```
+
+This will give you a fresh copy of the repository.
