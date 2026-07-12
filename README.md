@@ -171,3 +171,46 @@ A working Android app meeting build steps 1–5.
 A working iOS app meeting build steps 6–7.
 A written report on the OEM battery-optimization onboarding: which manufacturers were tested, which deep links work, and the measured drop-off at each permission step.
 Documentation of the Family Controls entitlement request status and, if denied, the reasoning.
+
+
+## Getting Started
+
+To start developing this project, follow these steps:
+
+### Prerequisites
+
+- Ensure you have the latest version of Android Studio and Xcode installed.
+- Install Flutter SDK if you are using Flutter for cross-platform development.
+- Set up your Android and iOS development environments as per their official documentation.
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   ```
+
+2. Navigate to the project directory:
+   ```bash
+   cd excerly
+   ```
+
+3. For Android, open the project in Android Studio and sync the Gradle files.
+
+4. For iOS, open the `.xcworkspace` file in Xcode.
+
+### Running the Application
+
+- For Android, select an emulator or a physical device and click on the 'Run' button in Android Studio.
+- For iOS, select a simulator or a physical device and click on the 'Run' button in Xcode.
+
+### Testing
+
+- Ensure all unit and integration tests pass before making any changes.
+- Use the provided test cases to verify the functionality of the alarm and focus window features.
+
+### Contributing
+
+- Fork the repository and create a new branch for your feature or bug fix.
+- Ensure your code adheres to the project's coding standards.
+- Submit a pull request with a detailed description of your changes.
