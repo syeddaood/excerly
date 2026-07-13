@@ -1,173 +1,111 @@
-# excerly
-Build Prompt: Mission-Based Alarm App with Enforced Morning Focus Window
+#Overview
 
-Paste this into your coding agent (Claude Code, Cursor, etc.). Adjust the bracketed choices before running.
+DawnLock is a cross-platform (iOS + Android) alarm-accountability app. Alarms cannot be dismissed until the user completes a "mission" (photograph a registered object, solve math problems, or speak an affirmation). Mission verification runs on-device with machine learning models — no cloud AI/LLM API calls for verification. The app tracks daily win/loss streaks, locks wake-up goals so they can't be changed after the fact, and gates premium features behind a subscription.
 
+This document is the authoritative specification. Every numbered requirement (R1–R42) must be implemented as real, working code — no stubs or placeholders. If a requirement is ambiguous, choose the most standard interpretation and record the assumption.
 
-Role & Objective
+Tech stack (fixed — do not substitute)
 
-You are building a production-grade mobile alarm application for iOS and Android. The app wakes the user with an alarm that cannot be dismissed without completing a physical task ("mission"), then enforces a 30-minute post-wake window in which the user is guided through a focus ritual and prevented from using distracting apps.
 
-Build for reliability first. An alarm app that fails to ring has no other features worth discussing.
+Mobile app: React Native + Expo (custom dev build / prebuild — NOT Expo Go), TypeScript, Expo Router.
+On-device ML: Google ML Kit image labeling for photo missions; platform speech recognition (iOS Speech framework / Android SpeechRecognizer) for voice missions. TensorFlow Lite is acceptable as a fallback if ML Kit integration blocks.
+Backend: Next.js (App Router) API routes, TypeScript, Prisma + PostgreSQL, Auth.js v5 (credentials + Google/Apple sign-in), Redis + BullMQ for scheduled jobs. Monorepo layout: apps/mobile, apps/api (or match repo's existing layout if present), packages/shared for shared types.
+Payments: RevenueCat SDK for subscriptions (iOS + Android).
+Tests: Vitest for backend/shared logic; Jest + React Native Testing Library for mobile components; mission verifier logic must be unit-testable with mocked ML outputs.
 
 
-Core User Flow
+Requirements
 
+A. Alarm core (the make-or-break section)
 
-Night before: User sets a wake time, chooses a mission type, and enters one priority task for tomorrow morning. Once the user is within 4 hours of their wake time, the alarm settings lock — no editing, no deleting the alarm.
-Alarm fires: Full-screen, sound escalates, no snooze button exists.
-Mission: Alarm continues until the mission is completed. Mission types must require physical movement away from the bed:
 
-Scan a QR code the user has physically placed somewhere in the home (bathroom mirror, coffee machine)
-Step count threshold (e.g. 30 steps detected by pedometer)
-Photograph a pre-registered object, verified by on-device image classification
-Fallback: math problems (weakest option — completable in bed; offer but deprioritize)
+R1. Users can create, edit, and delete alarms with: time, repeat days (Mon–Sun toggles), label, sound, and an assigned mission type.
+R2. Android: alarms fire exactly on time using AlarmManager.setExactAndAllowWhileIdle with a full-screen intent that launches the ringing screen even when the phone is locked, backed by a foreground service so the OS can't kill the ringing.
+R3. Android: request SCHEDULE_EXACT_ALARM and POST_NOTIFICATIONS permissions with an explanatory pre-prompt screen; detect battery-optimization restrictions and show a one-time guided prompt to whitelist the app (with OEM-specific help text for Samsung and Xiaomi).
+R4. iOS: implement alarms as a chain of local notifications (minimum 30 notifications at ~2-second intervals per alarm) that continue until the app is opened; tapping any notification opens directly into the ringing/mission screen.
+R5. The ringing screen shows current time, alarm label, and a single button: "Start mission". There is NO dismiss and NO snooze control anywhere on this screen.
+R6. Volume/hardware buttons and app backgrounding must not silence a ringing alarm on Android; on iOS, document the platform limitation in code comments and mitigate via the notification chain (R4).
+R7. If the app is killed and restarted while an alarm should be ringing (within its active window), the app reopens into the ringing/mission screen, not the home screen.
+R8. All alarm state is stored locally (SQLite or MMKV) so alarms work fully offline; server sync is additive, never required for an alarm to fire.
 
 
+B. Missions (on-device ML)
 
-Focus window (30 min, configurable 10–60): App presents a single, minimal ritual screen:
 
-Minute 0–2: display the priority task the user entered last night
-Minute 2–end: chosen ritual — journal prompt, stretch sequence, walk with live step count
-Distracting apps are shielded/blocked for the duration
-Leaving the app breaks the streak and is logged
+R9. Mission framework: a common interface Mission { start(): void; onResult(success: boolean): void; maxAttempts?: number } so new mission types can be added without touching the alarm flow.
+R10. Math mission: N problems (configurable 1–5) at three difficulty levels (single-digit add/subtract; two-digit multiply; mixed three-operand). Wrong answer regenerates a new problem. Alarm keeps ringing until all N are solved.
+R11. Photo-object mission — registration: during alarm setup the user photographs their target object (e.g., toothbrush, coffee machine); the app runs ML Kit image labeling on it and stores the top label set (with confidences) locally as the "object fingerprint".
+R12. Photo-object mission — wake time: user must photograph the same object; verification passes when the new photo's labels overlap the stored fingerprint above a tuned threshold. Verification is fully on-device and works offline. Include a debug/dev screen showing raw labels + confidences for tuning.
+R13. Photo mission fairness: after 5 consecutive failed attempts, show the registered object's setup photo as a hint (prevents the "it never recognizes my plunger" rage-quit); after 10, offer a fallback math mission at maximum difficulty — the alarm never becomes unwinnable.
+R14. Voice-affirmation mission: user records a chosen phrase at setup; at wake time, on-device speech-to-text transcribes their speech and passes on a fuzzy match (normalized Levenshtein similarity ≥ 0.8), tolerating minor mishears. Works offline where the platform's on-device recognition allows; otherwise degrade to R10 math fallback with a clear message.
+R15. Completing a mission stops the alarm/notification chain, records the wake event locally with timestamp, and shows a success screen with today's streak status.
 
 
+C. Streaks, goals, and the lock rule
 
-Completion: Streak increments. Show sleep duration and accumulated sleep debt.
 
+R16. Each day with an active alarm is a WIN (mission completed before target time + grace period of 10 minutes) or LOSS (missed/completed late). No retroactive edits, no late submissions.
+R17. Goal lock: an alarm's time and enabled/disabled state become immutable within 4 hours of its next fire time. The UI disables editing with a countdown ("Locked — fires in 2h 13m"); the enforcement is also validated server-side on sync (reject edits whose client timestamp falls inside the lock window).
+R18. Streak engine: current streak, longest streak, and a scrollable history strip (calendar heat-strip of wins/losses) on the home screen. Streak logic lives in packages/shared with full unit-test coverage including timezone-change and DST cases.
+R19. Server-side daily job (BullMQ, per-user timezone aware) finalizes yesterday's win/loss for synced users and resets streaks on a loss.
+R20. Personalization model (genuine ML, on-device or server, implementer's choice): logistic regression (or equivalent simple model) over the user's history — day of week, alarm time, recent success rate — producing an oversleep-risk score shown as a "risk meter" when setting an alarm, with a suggested adjustment ("You miss 7:00 AM Mondays 60% of the time — try 7:20"). Must retrain/update incrementally as new wake events arrive. No cloud LLM calls.
 
 
-Non-Negotiable Requirements
+D. Accounts and sync
 
-Emergency access
 
-An always-visible emergency exit must break the focus window immediately, with no friction beyond a single confirmation. It is logged but does not require justification. Phone dialer, emergency services, and Messages must remain reachable at all times. Do not attempt to circumvent OS protections for these. A user who feels trapped will uninstall.
+R21. Auth: email+password (bcrypt) and Sign in with Apple + Google via Auth.js v5. The app is fully usable anonymously (local-only); signing in enables sync and leaderboard.
+R22. Sync API: authenticated REST endpoints to push wake events/alarm configs and pull streak state; conflict rule is server-wins for finalized days, client-wins for future alarm configs (except inside the lock window, per R17).
+R23. Prisma schema: User, Alarm, WakeEvent, StreakSnapshot, Subscription — with a migration, seed script, and indexes on (userId, date).
+R24. Privacy: mission photos and audio never leave the device — only pass/fail results and label metadata sync. State this in a PRIVACY.md and enforce it in code (no photo/audio upload paths anywhere).
 
-Sleep health guardrails
 
-Do not gamify sleep deprivation. Implement:
+E. Monetization
 
 
-A bedtime commitment paired to each wake time. The streak counts only if both are met.
-A visible running sleep-debt figure.
-"Rest days" the user can bank and spend without breaking their streak.
-A hard warning (and refusal to lock in the streak) if the configured schedule yields under 6 hours of sleep.
+R25. Free tier: 1 active alarm, math missions only, 7-day streak history.
+R26. Premium (RevenueCat subscription, monthly + annual): unlimited alarms, photo + voice missions, full history, personalization risk meter, custom sounds.
+R27. Paywall placement: shown when a free user taps a premium feature — NEVER as a blocking wall after onboarding setup (this is the #1 complaint against the competitor; onboarding must complete fully and land the user on a working free alarm before any paywall is shown).
+R28. Restore purchases, subscription status caching for offline, and a Subscription row synced from RevenueCat webhooks to the backend.
 
 
-Privacy
+F. App shell and UX
 
 
-All mission verification (image classification, step counts) runs on-device. No photos leave the phone.
-On iOS, app-selection tokens from FamilyActivityPicker are opaque by design. Do not attempt to de-anonymize which apps a user shields.
-Store wake/sleep history locally. If syncing, make it opt-in and encrypted.
+R29. Screens: Onboarding (permissions walkthrough), Home (next alarm + streak strip + risk meter), Alarm editor, Mission picker + registration flows, Ringing screen, Mission screens (math/photo/voice), Success screen, History, Settings, Paywall, Auth.
+R30. Onboarding explains—in order—notification permission, exact-alarm permission (Android), battery whitelist (Android), microphone/camera (deferred until a mission needs them). Each permission screen states why before the system prompt.
+R31. Dark mode support; the Ringing screen is high-contrast and readable at arm's length, half-asleep.
+R32. All times displayed and computed in the user's current timezone; alarm scheduling recomputes on timezone change.
 
 
+G. Quality gates
 
-Platform Implementation
 
-Android (build this first)
+R33. TypeScript strict mode everywhere; typecheck script at repo root that covers all workspaces.
+R34. Unit tests: streak engine (R18) including DST/timezone edges; goal-lock enforcement (R17) client and server; mission verifiers with mocked ML/speech outputs (R12, R14); math generator difficulty bounds (R10).
+R35. Backend integration tests for sync endpoints (R22) including the lock-window rejection case.
+R36. A README.md with: dev-build setup for iOS + Android (including why Expo Go won't work), running the backend with Docker Compose (Postgres + Redis), and the manual alarm-reliability test checklist (locked phone, killed app, DND on, battery saver on).
+R37. CI script (GitHub Actions) running typecheck + all tests on push.
 
-Alarm reliability — solve before anything else:
 
+H. Explicit non-goals (do not build)
 
-AlarmManager.setExactAndAllowWhileIdle() with the SCHEDULE_EXACT_ALARM permission (USE_EXACT_ALARM where eligible).
-Foreground service with a persistent notification for the alarm and the focus window.
-Full-screen intent notification so the alarm surfaces over the lock screen.
-Handle Doze and App Standby explicitly.
-OEM battery killers: Samsung, Xiaomi, Oppo, Vivo, and Huawei aggressively terminate background services. Implement an onboarding flow that detects the manufacturer and deep-links the user to the correct autostart / battery-optimization exemption screen. Verify the exemption is granted before allowing the user to set their first alarm.
-Re-register all alarms on BOOT_COMPLETED.
 
+R38. No cloud AI/LLM calls anywhere in mission verification or personalization.
+R39. No social feed; leaderboard is out of scope for v1 (schema may anticipate it, no UI).
+R40. No sleep-tracking, sleep-stage detection, or health-data integration in v1.
+R41. No web version of the mobile app; the Next.js app is API-only plus a minimal landing page.
+R42. No admin dashboard in v1.
 
-Focus window enforcement:
 
-
-Foreground service polls UsageStatsManager (requires PACKAGE_USAGE_STATS) to detect the frontmost package.
-On detecting a blocked package, raise a full-screen overlay activity via SYSTEM_ALERT_WINDOW.
-Consider AccessibilityService for more reliable detection, but be aware Google Play restricts non-accessibility use of this API. Declare purpose carefully or ship without it.
-Do not use Device Admin / Device Owner. That is an enterprise MDM provisioning flow, not viable for consumer install.
-
-
-iOS
-
-Entitlement (apply on day one, before writing iOS code):
-
-
-Request the Family Controls entitlement from Apple. It is not granted automatically. Approval timeline is unpredictable.
-
-
-Alarm:
-
-
-iOS gives no background execution guarantee for alarms. Use UNNotificationRequest with a critical or time-sensitive interruption level and a custom sound. Be honest in the UI about the limits — you cannot force-ring a silenced phone the way Android can.
-Investigate AlarmKit (iOS 26+) if targeting recent OS versions.
-
-
-Focus window enforcement:
-
-
-FamilyControls for authorization, ManagedSettingsStore to apply shields, DeviceActivityCenter with a DeviceActivitySchedule to scope the shield to the 30-minute window and clear it after.
-Shield app categories and specific apps selected by the user via FamilyActivityPicker.
-The shield cannot cover the whole OS. Phone, Messages, and Settings remain accessible. Design around this, not against it.
-
-
-Fallback if the entitlement is denied:
-
-
-Soft enforcement: the app stays foreground during the window; backgrounding is detected via scenePhase / applicationDidEnterBackground and breaks the streak. The product must still be good in this mode. Treat the shield as an enhancement, not the core value.
-
-
-
-Architecture
-
-
-Shared: [Kotlin Multiplatform / React Native / Flutter / fully native per platform — pick one and justify]
-Alarm scheduling, mission verification, and focus-window enforcement must be native on both platforms. Cross-platform frameworks are unreliable for exact alarms and background execution. If using a cross-platform UI layer, isolate these subsystems behind a native module boundary.
-Local persistence: Room (Android) / SwiftData or Core Data (iOS).
-No backend required for v1. Streaks, history, and settings live on-device.
-
-
-
-Build Order
-
-
-Android alarm reliability. Alarm fires at the exact time, over the lock screen, on a Samsung device with battery optimization at defaults, after a reboot, in Doze. Do not proceed until this is bulletproof on real hardware.
-Permission onboarding flow. Measure drop-off. This is where you lose half your users.
-Missions (QR scan first — simplest and most effective).
-Focus window with ritual screens. Soft enforcement only.
-Android hard enforcement (overlay).
-iOS, mirroring 1–4.
-iOS shield, if and only if the entitlement is granted.
-
-
-
-Acceptance Criteria
-
-
-Alarm fires within 2 seconds of the set time on a cold-booted Samsung device with battery optimization enabled, 10 out of 10 trials.
-Alarm cannot be silenced without mission completion. Force-quitting the app does not silence it.
-The user cannot edit or delete an alarm within 4 hours of its fire time.
-The emergency exit is reachable within one tap from any screen during the focus window.
-No photo, image, or biometric data leaves the device.
-A user configuring under 6 hours of sleep is warned and cannot earn a streak for that night.
-Uninstalling during a focus window is possible (do not fight this) but logs a broken streak on reinstall.
-
-
-
-What Not To Do
-
-
-Do not claim the app "locks the phone." It does not. Neither OS permits this for consumer apps. Market it as a shield and a ritual.
-Do not use AccessibilityService as a general-purpose blocker on Android without a defensible declared purpose. Play will pull the app.
-Do not build the mission system before the alarm is reliable.
-Do not let the streak mechanic punish a user for sleeping.
-
-
-
-Deliverables
-
-
-A working Android app meeting build steps 1–5.
-A working iOS app meeting build steps 6–7.
-A written report on the OEM battery-optimization onboarding: which manufacturers were tested, which deep links work, and the measured drop-off at each permission step.
-Documentation of the Family Controls entitlement request status and, if denied, the reasoning.
+Build order (respect this sequencing)
+
+
+Monorepo scaffold + backend skeleton + shared package (R23, R33).
+Alarm core on both platforms (R1–R8) — validate on real devices before proceeding.
+Math mission end-to-end (R9, R10, R15).
+Streaks + goal lock, local first (R16–R18), then sync + daily job (R19, R21–R22).
+Photo mission with ML Kit (R11–R13), then voice (R14).
+Personalization model (R20).
+Paywall + RevenueCat (R25–R28).
+Polish, onboarding, quality gates (R29–R37).
