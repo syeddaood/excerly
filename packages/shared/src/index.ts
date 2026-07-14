@@ -14,6 +14,15 @@ export interface Alarm {
   time: string;
   enabled: boolean;
   missionId: MissionId | null;
+  /**
+   * Optional weekday names for recurrence (e.g. ["Mon","Wed"]).
+   * Empty / omitted means every day. Used by Android exact-alarm scheduling.
+   */
+  repeatDays?: string[];
+  /** Ringtone key; default handled by the platform ringing service. */
+  sound?: string;
+  /** Mission kind string used by the ringing / mission flow. */
+  missionType?: MissionKind | string;
 }
 
 /** Placeholder mission kinds; concrete mission payloads arrive in later issues. */
