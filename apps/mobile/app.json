@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "DawnLock",
+    "slug": "dawnlock",
+    "version": "0.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.dawnlock.app"
+    },
+    "android": {
+      "package": "com.dawnlock.app"
+    }
+  }
+}
