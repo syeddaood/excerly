@@ -7,7 +7,7 @@ import android.util.Log
 
 /**
  * Receives the exact-alarm PendingIntent from AlarmManager and starts the
- * ringing foreground service + full-screen activity.
+ * ringing foreground service + deep-links into the RN ring screen.
  */
 class AlarmReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent?) {
@@ -15,30 +15,34 @@ class AlarmReceiver : BroadcastReceiver() {
 
     val alarmId = intent.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID) ?: return
     val label = intent.getStringExtra(AlarmScheduler.EXTRA_LABEL) ?: ""
+    val missionKind = intent.getStringExtra(AlarmScheduler.EXTRA_MISSION_KIND) ?: "math"
 
-    Log.i(TAG, "Exact alarm fired id=$alarmId label=$label")
+    Log.i(TAG, "Alarm fired id=$alarmId label=$label")
 
-    // One-shot: drop from the store so reboot does not re-fire immediately.
-    AlarmStore.remove(context, alarmId)
+    // Do NOT remove from AlarmStore — JS reschedules the next occurrence via onAlarmFired.
 
-    // Start the foreground service that keeps the alarm ringing.
     AlarmRingingService.start(context, alarmId, label)
 
-    // Also launch the full-screen ringing activity over the lock screen.
-    // (The service notification also carries a full-screen intent as a backup.)
-    val activityIntent = Intent(context, AlarmRingingActivity::class.java).apply {
-      addFlags(
-        Intent.FLAG_ACTIVITY_NEW_TASK or
-          Intent.FLAG_ACTIVITY_CLEAR_TOP or
-          Intent.FLAG_ACTIVITY_NO_USER_ACTION
-      )
-      putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
-      putExtra(AlarmScheduler.EXTRA_LABEL, label)
-    }
+    val deepLink = AlarmScheduler.buildRingDeepLinkIntent(context, alarmId, label, missionKind)
     try {
-      context.startActivity(activityIntent)
+      context.startActivity(deepLink)
     } catch (e: Exception) {
-      Log.w(TAG, "Could not start ringing activity directly; relying on FSI", e)
+      Log.w(TAG, "Deep link failed; falling back to AlarmRingingActivity", e)
+      val fallback = Intent(context, AlarmRingingActivity::class.java).apply {
+        addFlags(
+          Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+            Intent.FLAG_ACTIVITY_NO_USER_ACTION
+        )
+        putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
+        putExtra(AlarmScheduler.EXTRA_LABEL, label)
+        putExtra(AlarmScheduler.EXTRA_MISSION_KIND, missionKind)
+      }
+      try {
+        context.startActivity(fallback)
+      } catch (e2: Exception) {
+        Log.w(TAG, "Could not start ringing activity; relying on FSI", e2)
+      }
     }
   }
 

@@ -109,3 +109,55 @@ Photo mission with ML Kit (R11–R13), then voice (R14).
 Personalization model (R20).
 Paywall + RevenueCat (R25–R28).
 Polish, onboarding, quality gates (R29–R37).
+
+---
+
+## Phase 1 — Alarm core (implemented)
+
+Phase 1 delivers a production-quality Android alarm core with local persistence, Expo Router shell, ring screen, and math mission. **Expo Go is not supported** — use a dev client build for native alarms.
+
+### Setup
+
+```bash
+# From repo root
+npm install
+
+# First-time Android dev client (generates native project + installs on device/emulator)
+cd apps/mobile
+npx expo prebuild --platform android
+npx expo run:android
+
+# Or from repo root after prebuild:
+npm run android:dev
+```
+
+### Development
+
+```bash
+# LAN dev server (phone and computer on same Wi‑Fi)
+npm run start:mobile
+
+# USB reverse-tunnel (adb required)
+npm run start:mobile:adb
+```
+
+### Unit tests
+
+```bash
+npm run test -w @dawnlock/shared
+npm run test -w @dawnlock/mobile
+```
+
+### Manual reliability checklist
+
+1. Create an alarm 2 minutes ahead, lock the phone → must ring with full-screen intent
+2. Force-kill the app before fire → must still ring
+3. Reboot the device before fire → must still ring (`BootReceiver`)
+4. Complete the math mission → ringing stops, success screen shows
+5. Create a Sat-only alarm → verify next trigger is Saturday (unit test + manual)
+
+### Architecture notes
+
+- **JS:** Zustand + MMKV persistence, alarm engine (`syncNativeAlarms`, `onAlarmFired` reschedule)
+- **Android:** `AlarmManager.setAlarmClock`, native `AlarmStore`, deep link `dawnlock://ring?alarmId=...`
+- **iOS (Phase 1):** stub only — native scheduler no-ops; full iOS support in a later phase

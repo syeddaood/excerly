@@ -8,29 +8,42 @@ export type ScheduleExactAlarmParams = {
   triggerAtMillis: number;
   /** Human-readable label shown on the full-screen ringing UI. */
   label?: string;
+  repeatDays?: string[];
+  missionKind?: string;
 };
 
 /**
- * Schedule an exact Android alarm via AlarmManager.setExactAndAllowWhileIdle.
- * No-ops on non-Android platforms (iOS is handled by a separate issue).
+ * Whether the custom Android alarm native module is linked (dev build only).
+ */
+export function isNativeAlarmLinked(): boolean {
+  return Platform.OS === "android" && AndroidAlarmModule != null;
+}
+
+/**
+ * Schedule an exact Android alarm via AlarmManager.setAlarmClock.
+ * No-ops on non-Android platforms and when the native module is not linked (Expo Go).
  */
 export function scheduleExactAlarm(params: ScheduleExactAlarmParams): void {
   if (Platform.OS !== "android") {
     return;
   }
   if (!AndroidAlarmModule) {
-    throw new Error(
-      "dawnlock-android-alarm native module is not linked. Use a dev client / prebuild build (Expo Go is unsupported)."
-    );
+    if (__DEV__) {
+      console.warn(
+        "[DawnLock] Native alarm module not linked — alarms will not fire. " +
+          "Use `npx expo run:android` for a dev build."
+      );
+    }
+    return;
   }
-  const { alarmId, triggerAtMillis, label = "" } = params;
+  const { alarmId, triggerAtMillis, label = "", repeatDays = [], missionKind = "math" } = params;
   if (!alarmId) {
     throw new Error("scheduleExactAlarm requires a non-empty alarmId");
   }
   if (!Number.isFinite(triggerAtMillis) || triggerAtMillis <= 0) {
     throw new Error("scheduleExactAlarm requires a positive triggerAtMillis");
   }
-  AndroidAlarmModule.scheduleExactAlarm(alarmId, triggerAtMillis, label);
+  AndroidAlarmModule.scheduleExactAlarm(alarmId, triggerAtMillis, label, repeatDays, missionKind);
 }
 
 /**
@@ -78,4 +91,5 @@ export default {
   cancelExactAlarm,
   canScheduleExactAlarms,
   stopRinging,
+  isNativeAlarmLinked,
 };

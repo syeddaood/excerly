@@ -10,41 +10,36 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * Expo native module that schedules exact Android alarms via
- * AlarmManager.setExactAndAllowWhileIdle and cancels them by id.
- *
- * Acceptance (issue #10):
- * - Alarms use AlarmManager.setExactAndAllowWhileIdle
- * - A full-screen intent is used for the ringing UI
- * - A foreground service keeps the alarm ringing
- * - Alarms are rescheduled after reboot (BootReceiver + AlarmStore)
+ * AlarmManager.setAlarmClock and cancels them by id.
  */
 class AndroidAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("AndroidAlarm")
 
-    /**
-     * Schedule an exact alarm that will fire even in Doze.
-     * @param alarmId Stable string id (used as PendingIntent request code seed)
-     * @param triggerAtMillis UTC epoch millis when the alarm should fire
-     * @param label Optional human-readable label for the ringing UI
-     */
-    Function("scheduleExactAlarm") { alarmId: String, triggerAtMillis: Double, label: String ->
+    Function("scheduleExactAlarm") {
+      alarmId: String,
+      triggerAtMillis: Double,
+      label: String,
+      repeatDays: List<String>,
+      missionKind: String ->
       val context = appContext.reactContext
         ?: throw IllegalStateException("React context is not available")
-      AlarmScheduler.schedule(context, alarmId, triggerAtMillis.toLong(), label)
+      AlarmScheduler.schedule(
+        context,
+        alarmId,
+        triggerAtMillis.toLong(),
+        label,
+        repeatDays,
+        missionKind
+      )
     }
 
-    /** Cancel a previously scheduled exact alarm. */
     Function("cancelAlarm") { alarmId: String ->
       val context = appContext.reactContext
         ?: throw IllegalStateException("React context is not available")
       AlarmScheduler.cancel(context, alarmId)
     }
 
-    /**
-     * Whether the app can schedule exact alarms (API 31+ privilege check).
-     * Always true on pre-S devices.
-     */
     Function("canScheduleExactAlarms") {
       val context = appContext.reactContext
         ?: return@Function false
@@ -56,7 +51,6 @@ class AndroidAlarmModule : Module() {
       }
     }
 
-    /** Stop the ringing foreground service (after mission success). */
     Function("stopRinging") {
       val context = appContext.reactContext
         ?: throw IllegalStateException("React context is not available")
@@ -65,56 +59,80 @@ class AndroidAlarmModule : Module() {
   }
 }
 
-/**
- * Shared helpers for building PendingIntents and talking to AlarmManager.
- * Used by the Expo module and by BootReceiver for reschedule-after-reboot.
- */
 object AlarmScheduler {
   private const val ACTION_FIRE = "com.dawnlock.app.ACTION_ALARM_FIRE"
+  private const val DEEP_LINK_SCHEME = "dawnlock"
 
-  fun schedule(context: Context, alarmId: String, triggerAtMillis: Long, label: String) {
-    // Persist so BootReceiver can restore after reboot.
-    AlarmStore.put(context, alarmId, triggerAtMillis, label)
+  fun schedule(
+    context: Context,
+    alarmId: String,
+    triggerAtMillis: Long,
+    label: String,
+    repeatDays: List<String> = emptyList(),
+    missionKind: String = "math"
+  ) {
+    AlarmStore.put(context, alarmId, triggerAtMillis, label, repeatDays, missionKind)
 
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    val pending = buildFirePendingIntent(context, alarmId, label)
+    val pending = buildFirePendingIntent(context, alarmId, label, missionKind)
 
-    // Core acceptance criterion: exact + allow-while-idle (Doze-safe).
-    alarmManager.setExactAndAllowWhileIdle(
-      AlarmManager.RTC_WAKEUP,
-      triggerAtMillis,
-      pending
-    )
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+      val showIntent = buildRingDeepLinkIntent(context, alarmId, label, missionKind)
+      val showPending = PendingIntent.getActivity(
+        context,
+        requestCodeFor(alarmId) + 100,
+        showIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+      val info = AlarmManager.AlarmClockInfo(triggerAtMillis, showPending)
+      alarmManager.setAlarmClock(info, pending)
+    } else {
+      alarmManager.setExactAndAllowWhileIdle(
+        AlarmManager.RTC_WAKEUP,
+        triggerAtMillis,
+        pending
+      )
+    }
   }
 
   fun cancel(context: Context, alarmId: String) {
     AlarmStore.remove(context, alarmId)
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    val pending = buildFirePendingIntent(context, alarmId, label = "")
+    val pending = buildFirePendingIntent(context, alarmId, label = "", missionKind = "math")
     alarmManager.cancel(pending)
     pending.cancel()
   }
 
-  /** Reschedule every persisted future alarm (called from BootReceiver). */
   fun rescheduleAll(context: Context) {
     val now = System.currentTimeMillis()
     for (entry in AlarmStore.all(context)) {
       if (entry.triggerAtMillis > now) {
-        schedule(context, entry.alarmId, entry.triggerAtMillis, entry.label)
+        schedule(
+          context,
+          entry.alarmId,
+          entry.triggerAtMillis,
+          entry.label,
+          entry.repeatDays,
+          entry.missionKind
+        )
       } else {
-        // Stale past alarm — drop it so we don't immediately fire on boot.
         AlarmStore.remove(context, entry.alarmId)
       }
     }
   }
 
-  fun buildFirePendingIntent(context: Context, alarmId: String, label: String): PendingIntent {
+  fun buildFirePendingIntent(
+    context: Context,
+    alarmId: String,
+    label: String,
+    missionKind: String
+  ): PendingIntent {
     val intent = Intent(context, AlarmReceiver::class.java).apply {
       action = ACTION_FIRE
       putExtra(EXTRA_ALARM_ID, alarmId)
       putExtra(EXTRA_LABEL, label)
-      // Unique data so PendingIntents for different alarms don't collide.
-      data = android.net.Uri.parse("dawnlock://alarm/$alarmId")
+      putExtra(EXTRA_MISSION_KIND, missionKind)
+      data = android.net.Uri.parse("$DEEP_LINK_SCHEME://alarm/$alarmId")
     }
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     return PendingIntent.getBroadcast(
@@ -125,12 +143,28 @@ object AlarmScheduler {
     )
   }
 
+  fun buildRingDeepLinkIntent(
+    context: Context,
+    alarmId: String,
+    label: String,
+    missionKind: String
+  ): Intent {
+    val uri = android.net.Uri.parse("$DEEP_LINK_SCHEME://ring?alarmId=$alarmId")
+    return Intent(Intent.ACTION_VIEW, uri).apply {
+      setPackage(context.packageName)
+      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      putExtra(EXTRA_ALARM_ID, alarmId)
+      putExtra(EXTRA_LABEL, label)
+      putExtra(EXTRA_MISSION_KIND, missionKind)
+    }
+  }
+
   fun requestCodeFor(alarmId: String): Int {
-    // Stable positive request code derived from the alarm id.
     return alarmId.hashCode() and 0x7fffffff
   }
 
   const val EXTRA_ALARM_ID = "alarmId"
   const val EXTRA_LABEL = "label"
+  const val EXTRA_MISSION_KIND = "missionKind"
   const val ACTION_FIRE_CONST = ACTION_FIRE
 }

@@ -1,102 +1,87 @@
-import React, { useCallback, useEffect, useState } from "react";
-import { View, Text, Button, FlatList, StyleSheet, Platform } from "react-native";
+import React from "react";
+import { View, Text, FlatList, Pressable, Switch, StyleSheet } from "react-native";
 import type { Alarm } from "@dawnlock/shared";
-import {
-  cancelAndroidAlarm,
-  scheduleAndroidAlarm,
-  type SchedulableAlarm,
-} from "../alarms";
+import { formatAlarmLabel } from "@dawnlock/shared";
 
-export type AlarmListProps = {
-  /** Alarms (e.g. loaded from API / local store). Kept in sync via props. */
-  initialAlarms?: Alarm[];
-  onEdit?: (alarm: Alarm) => void;
-  onCreate?: () => void;
-  onDeleted?: (alarmId: string) => void;
+type AlarmListProps = {
+  alarms: Alarm[];
+  onToggle: (id: string) => void;
+  onPress: (id: string) => void;
+  onCreate: () => void;
 };
 
-/**
- * Lists alarms and wires enable/delete to the Android exact-alarm scheduler.
- * On non-Android platforms the native calls no-op.
- */
-const AlarmList = ({
-  initialAlarms = [],
-  onEdit,
-  onCreate,
-  onDeleted,
-}: AlarmListProps) => {
-  const [alarms, setAlarms] = useState<Alarm[]>(initialAlarms);
+function repeatLabel(days: string[]): string {
+  if (!days || days.length === 0) return "Every day";
+  if (days.length === 7) return "Every day";
+  return days.join(", ");
+}
 
-  useEffect(() => {
-    setAlarms(initialAlarms);
-  }, [initialAlarms]);
-
-  const toSchedulable = useCallback((alarm: Alarm, enabled = true): SchedulableAlarm => {
-    return {
-      id: alarm.id,
-      time: alarm.time,
-      repeatDays: alarm.repeatDays,
-      label: alarm.label,
-      enabled,
-    };
-  }, []);
-
-  const handleDelete = useCallback(
-    (alarm: Alarm) => {
-      cancelAndroidAlarm(alarm.id);
-      setAlarms((prev) => prev.filter((a) => a.id !== alarm.id));
-      onDeleted?.(alarm.id);
-    },
-    [onDeleted]
-  );
-
-  const handleEnable = useCallback(
-    (alarm: Alarm) => {
-      scheduleAndroidAlarm(toSchedulable(alarm, true));
-    },
-    [toSchedulable]
-  );
-
+export function AlarmList({ alarms, onToggle, onPress, onCreate }: AlarmListProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.heading}>Alarm List</Text>
-      {Platform.OS === "android" ? (
-        <Text style={styles.hint}>Android exact alarms via AlarmManager</Text>
-      ) : null}
+      <View style={styles.header}>
+        <Text style={styles.heading}>Alarms</Text>
+        <Pressable onPress={onCreate} style={styles.addButton}>
+          <Text style={styles.addText}>+ New</Text>
+        </Pressable>
+      </View>
       <FlatList
         data={alarms}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={styles.label}>
-              {item.label || "Alarm"} — {item.time}
-            </Text>
-            <View style={styles.actions}>
-              <Button title="Enable" onPress={() => handleEnable(item)} />
-              <Button title="Edit" onPress={() => onEdit?.(item)} />
-              <Button title="Delete" onPress={() => handleDelete(item)} />
-            </View>
-          </View>
-        )}
         keyExtractor={(item) => item.id}
-        ListEmptyComponent={<Text style={styles.empty}>No alarms yet</Text>}
+        ListEmptyComponent={
+          <Text style={styles.empty}>No alarms yet. Tap + New to create one.</Text>
+        }
+        renderItem={({ item }) => (
+          <Pressable style={styles.row} onPress={() => onPress(item.id)}>
+            <View style={styles.info}>
+              <Text style={[styles.time, !item.enabled && styles.disabled]}>
+                {item.time}
+              </Text>
+              <Text style={[styles.label, !item.enabled && styles.disabled]}>
+                {item.label}
+              </Text>
+              <Text style={styles.repeat}>{repeatLabel(item.repeatDays)}</Text>
+            </View>
+            <Switch value={item.enabled} onValueChange={() => onToggle(item.id)} />
+          </Pressable>
+        )}
       />
-      {onCreate ? <Button title="Create Alarm" onPress={onCreate} /> : null}
     </View>
   );
-};
+}
+
+export function formatNextAlarm(alarm: Alarm | null): string {
+  if (!alarm) return "No upcoming alarm";
+  return formatAlarmLabel(alarm);
+}
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
-  heading: { fontSize: 20, fontWeight: "600", marginBottom: 8 },
-  hint: { fontSize: 12, color: "#666", marginBottom: 8 },
-  row: {
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
   },
-  label: { fontSize: 16, marginBottom: 4 },
-  actions: { flexDirection: "row", gap: 8 },
-  empty: { color: "#888", marginVertical: 16 },
+  heading: { fontSize: 24, fontWeight: "700" },
+  addButton: {
+    backgroundColor: "#1a73e8",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  addText: { color: "#fff", fontWeight: "600" },
+  empty: { color: "#888", textAlign: "center", marginTop: 40 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "#ddd",
+  },
+  info: { flex: 1 },
+  time: { fontSize: 32, fontWeight: "700" },
+  label: { fontSize: 16, color: "#333" },
+  repeat: { fontSize: 13, color: "#888", marginTop: 2 },
+  disabled: { color: "#bbb" },
 });
-
-export default AlarmList;

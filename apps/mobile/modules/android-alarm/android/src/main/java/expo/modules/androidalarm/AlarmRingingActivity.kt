@@ -3,6 +3,7 @@ package expo.modules.androidalarm
 import android.app.Activity
 import android.app.KeyguardManager
 import android.content.Context
+import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
@@ -10,15 +11,13 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Full-screen ringing activity shown over the lock screen when an exact alarm fires.
- * The mission UI (photo / math / steps) will be layered on top in later issues;
- * for issue #10 this activity proves the full-screen intent path works.
+ * Full-screen ringing shell shown over the lock screen.
+ * Opens the RN ring route via deep link; shows a minimal fallback if that fails.
  */
 class AlarmRingingActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
 
-    // Show over lock screen + turn screen on (API 27+ flags + legacy window flags).
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
       setShowWhenLocked(true)
       setTurnScreenOn(true)
@@ -36,6 +35,16 @@ class AlarmRingingActivity : Activity() {
 
     val alarmId = intent?.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID) ?: ""
     val label = intent?.getStringExtra(AlarmScheduler.EXTRA_LABEL) ?: "Alarm"
+    val missionKind = intent?.getStringExtra(AlarmScheduler.EXTRA_MISSION_KIND) ?: "math"
+
+    val deepLink = AlarmScheduler.buildRingDeepLinkIntent(this, alarmId, label, missionKind)
+    try {
+      startActivity(deepLink)
+      finish()
+      return
+    } catch (_: Exception) {
+      // Fall through to placeholder UI.
+    }
 
     val root = LinearLayout(this).apply {
       orientation = LinearLayout.VERTICAL
@@ -54,7 +63,7 @@ class AlarmRingingActivity : Activity() {
       setTextColor(0xFFFFCC00.toInt())
     }
     val body = TextView(this).apply {
-      text = "Complete your mission to dismiss.\n(id: $alarmId)"
+      text = "Open DawnLock and complete your $missionKind mission.\n(id: $alarmId)"
       textSize = 16f
       setTextColor(0xFFCCCCCC.toInt())
     }

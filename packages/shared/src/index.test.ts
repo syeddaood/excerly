@@ -1,17 +1,20 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { formatAlarmLabel, PACKAGE_NAME, type Alarm } from "./index";
+import { createDefaultAlarm, formatAlarmLabel, PACKAGE_NAME } from "./index";
 
-describe("@dawnlock/shared smoke", () => {
-  it("exports package identity", () => {
-    assert.equal(PACKAGE_NAME, "@dawnlock/shared");
+describe("@dawnlock/shared", () => {
+  it("formatAlarmLabel", () => {
+    assert.equal(formatAlarmLabel({ time: "06:30", label: "Wake up" }), "06:30 — Wake up");
   });
 
-  it("formats an alarm label", () => {
-    const alarm: Pick<Alarm, "label" | "time"> = {
-      label: "Wake up",
-      time: "06:30",
-    };
-    assert.equal(formatAlarmLabel(alarm), "06:30 — Wake up");
+  it("createDefaultAlarm", () => {
+    const alarm = createDefaultAlarm({ label: "Test" });
+    assert.equal(alarm.label, "Test");
+    assert.equal(alarm.mission.kind, "math");
+    assert.equal(alarm.enabled, true);
+  });
+
+  it("PACKAGE_NAME", () => {
+    assert.equal(PACKAGE_NAME, "@dawnlock/shared");
   });
 });

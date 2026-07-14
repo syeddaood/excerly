@@ -3,10 +3,14 @@
     "name": "DawnLock",
     "slug": "dawnlock",
     "version": "0.0.1",
+    "scheme": "dawnlock",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "plugins": [
-      "./modules/android-alarm/app.plugin.js"
+      "./modules/android-alarm/app.plugin.js",
+      "expo-router",
+      "expo-asset",
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": true,
@@ -24,6 +28,18 @@
         "VIBRATE",
         "POST_NOTIFICATIONS",
         "USE_FULL_SCREEN_INTENT"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "dawnlock"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     }
   }

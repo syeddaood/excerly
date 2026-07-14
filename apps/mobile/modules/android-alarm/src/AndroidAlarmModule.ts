@@ -5,7 +5,9 @@ export type AndroidAlarmNativeModule = {
   scheduleExactAlarm(
     alarmId: string,
     triggerAtMillis: number,
-    label: string
+    label: string,
+    repeatDays: string[],
+    missionKind: string
   ): void;
   cancelAlarm(alarmId: string): void;
   canScheduleExactAlarms(): boolean;

@@ -8,13 +8,30 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "node scripts/link-expo-packages.js && npm run build -w @dawnlock/shared",
+    "start:mobile": "bash scripts/start-mobile.sh",
+    "start:mobile:tunnel": "bash scripts/start-mobile-tunnel.sh",
+    "start:mobile:adb": "bash scripts/start-mobile-adb.sh",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "typecheck:shared": "npm run typecheck -w @dawnlock/shared",
     "test": "npm run test --workspaces --if-present",
-    "test:shared": "npm run test -w @dawnlock/shared"
+    "test:shared": "npm run test -w @dawnlock/shared",
+    "android:dev": "npm run android:dev -w @dawnlock/mobile"
   },
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "npm@10"
+  "packageManager": "npm@10",
+  "overrides": {
+    "react-native": "0.81.5",
+    "@dawnlock/api": {
+      "react": "19.2.7",
+      "react-dom": "19.2.7"
+    },
+    "@dawnlock/mobile": {
+      "react": "19.1.0",
+      "react-dom": "19.1.0",
+      "react-native": "0.81.5"
+    }
+  }
 }

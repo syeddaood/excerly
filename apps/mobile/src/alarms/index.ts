@@ -1,6 +1,5 @@
 /**
  * Public surface for mobile alarm scheduling.
- * Issue #10: Android exact-alarm firing (AlarmManager + FGS + full-screen intent).
  */
 
 export {
@@ -12,4 +11,11 @@ export {
   type SchedulableAlarm,
 } from "./androidAlarmService";
 
-export { nextTriggerAtMillis, parseWallClockTime } from "./schedule";
+export { syncNativeAlarms, onAlarmFired, cancelAlarm, deleteAlarmEngine } from "./engine";
+
+export {
+  nextTriggerAtMillis,
+  nextTriggerAfterMillis,
+  parseWallClockTime,
+  pickRandomOffsetMinutes,
+} from "@dawnlock/shared";
