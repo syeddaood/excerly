@@ -11,8 +11,12 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * Full-screen ringing shell shown over the lock screen.
- * Opens the RN ring route via deep link; shows a minimal fallback if that fails.
+ * Full-screen ringing shell shown over the lock screen via the FGS
+ * notification's full-screen intent.
+ *
+ * Declared with showWhenLocked + turnScreenOn in the module AndroidManifest.
+ * Immediately deep-links into the Expo Router `/ring` route
+ * (`dawnlock://ring?alarmId=...`); shows a minimal fallback UI if that fails.
  */
 class AlarmRingingActivity : Activity() {
   override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,5 +76,10 @@ class AlarmRingingActivity : Activity() {
     root.addView(subtitle)
     root.addView(body)
     setContentView(root)
+  }
+
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    setIntent(intent)
   }
 }

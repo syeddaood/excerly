@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -18,11 +19,11 @@ import android.os.VibratorManager
 import android.util.Log
 
 /**
- * Foreground service that keeps the alarm ringing until the user completes
- * the mission (or stopRinging is called from JS).
+ * Foreground service (type: mediaPlayback) that owns the ringing session so
+ * the OS cannot kill audio/vibration while the user completes the mission.
  *
- * The notification uses a full-screen intent so the ringing UI appears over
- * the lock screen even when the device is idle.
+ * The notification uses a full-screen intent targeting [AlarmRingingActivity]
+ * so the ringing UI appears over the lock screen even when the device is idle.
  */
 class AlarmRingingService : Service() {
   private var mediaPlayer: MediaPlayer? = null
@@ -38,12 +39,17 @@ class AlarmRingingService : Service() {
 
     val alarmId = intent?.getStringExtra(AlarmScheduler.EXTRA_ALARM_ID) ?: "unknown"
     val label = intent?.getStringExtra(AlarmScheduler.EXTRA_LABEL) ?: "Alarm"
+    val missionKind = intent?.getStringExtra(AlarmScheduler.EXTRA_MISSION_KIND) ?: "math"
 
     ensureChannel()
-    val notification = buildNotification(alarmId, label)
+    val notification = buildNotification(alarmId, label, missionKind)
     // mediaPlayback FGS type matches the manifest foregroundServiceType.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-      startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+      startForeground(
+        NOTIFICATION_ID,
+        notification,
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+      )
     } else {
       startForeground(NOTIFICATION_ID, notification)
     }
@@ -133,11 +139,14 @@ class AlarmRingingService : Service() {
     manager.createNotificationChannel(channel)
   }
 
-  private fun buildNotification(alarmId: String, label: String): Notification {
+  private fun buildNotification(alarmId: String, label: String, missionKind: String): Notification {
+    // Full-screen intent → AlarmRingingActivity (showWhenLocked / turnScreenOn),
+    // which deep-links into the Expo Router /ring route.
     val fullScreenIntent = Intent(this, AlarmRingingActivity::class.java).apply {
       addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
       putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
       putExtra(AlarmScheduler.EXTRA_LABEL, label)
+      putExtra(AlarmScheduler.EXTRA_MISSION_KIND, missionKind)
     }
     val fullScreenPending = PendingIntent.getActivity(
       this,
@@ -160,12 +169,13 @@ class AlarmRingingService : Service() {
       Notification.Builder(this)
     }
 
+    @Suppress("DEPRECATION")
     return builder
       .setContentTitle("DawnLock Alarm")
       .setContentText(if (label.isNotBlank()) label else "Time to wake up")
       .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
       .setContentIntent(contentPending)
-      .setFullScreenIntent(fullScreenPending, true)
+      .setFullScreenIntent(fullScreenPending, /* highPriority = */ true)
       .setOngoing(true)
       .setCategory(Notification.CATEGORY_ALARM)
       .setVisibility(Notification.VISIBILITY_PUBLIC)
@@ -179,10 +189,16 @@ class AlarmRingingService : Service() {
     private const val NOTIFICATION_ID = 71001
     private const val ACTION_STOP = "com.dawnlock.app.ACTION_STOP_RINGING"
 
-    fun start(context: Context, alarmId: String, label: String) {
+    fun start(
+      context: Context,
+      alarmId: String,
+      label: String,
+      missionKind: String = "math"
+    ) {
       val intent = Intent(context, AlarmRingingService::class.java).apply {
         putExtra(AlarmScheduler.EXTRA_ALARM_ID, alarmId)
         putExtra(AlarmScheduler.EXTRA_LABEL, label)
+        putExtra(AlarmScheduler.EXTRA_MISSION_KIND, missionKind)
       }
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         context.startForegroundService(intent)

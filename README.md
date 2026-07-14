@@ -159,5 +159,5 @@ npm run test -w @dawnlock/mobile
 ### Architecture notes
 
 - **JS:** Zustand + MMKV persistence, alarm engine (`syncNativeAlarms`, `onAlarmFired` reschedule)
-- **Android:** `AlarmManager.setAlarmClock`, native `AlarmStore`, deep link `dawnlock://ring?alarmId=...`
+- **Android:** `AlarmManager.setExactAndAllowWhileIdle`, native `AlarmStore` + `BootReceiver`, mediaPlayback FGS + full-screen intent → `dawnlock://ring?alarmId=...`
 - **iOS (Phase 1):** stub only — native scheduler no-ops; full iOS support in a later phase
