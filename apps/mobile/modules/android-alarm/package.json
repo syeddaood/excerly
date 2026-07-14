@@ -1,0 +1,19 @@
+{
+  "name": "dawnlock-android-alarm",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Native Android exact-alarm firing for DawnLock (AlarmManager + FGS + full-screen intent)",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "expo": "*",
+    "react": "*",
+    "react-native": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

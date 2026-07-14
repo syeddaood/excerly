@@ -10,6 +10,24 @@
 
 The mobile app is built using React Native and Expo. It includes components for creating, editing, and deleting alarms.
 
+### Android exact-alarm firing (issue #10)
+
+Native module: `apps/mobile/modules/android-alarm` (`dawnlock-android-alarm`).
+
+| Piece | Role |
+|-------|------|
+| `AndroidAlarmModule.kt` | Expo module API → `AlarmManager.setExactAndAllowWhileIdle` |
+| `AlarmReceiver` | BroadcastReceiver that starts ringing FGS + full-screen activity |
+| `AlarmRingingService` | Foreground service (mediaPlayback) with full-screen intent notification |
+| `AlarmRingingActivity` | Lock-screen full-screen ringing UI |
+| `BootReceiver` | Reschedules persisted alarms after `BOOT_COMPLETED` |
+| `AlarmStore` | SharedPreferences store of scheduled alarms for reboot restore |
+| `src/alarms/*` | JS helpers: next trigger time + schedule/cancel wrappers |
+
+Permissions (manifest + config plugin): `SCHEDULE_EXACT_ALARM`, `USE_EXACT_ALARM`, `RECEIVE_BOOT_COMPLETED`, `FOREGROUND_SERVICE(_MEDIA_PLAYBACK)`, `USE_FULL_SCREEN_INTENT`, `WAKE_LOCK`, `VIBRATE`, `POST_NOTIFICATIONS`.
+
+Requires a **dev client / prebuild** build (not Expo Go) so the local Expo module is linked.
+
 ## Backend API
 
 The backend is built using Next.js and provides API routes for managing alarms.

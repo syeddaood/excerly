@@ -5,12 +5,26 @@
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
+    "plugins": [
+      "./modules/android-alarm/app.plugin.js"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.dawnlock.app"
     },
     "android": {
-      "package": "com.dawnlock.app"
+      "package": "com.dawnlock.app",
+      "permissions": [
+        "SCHEDULE_EXACT_ALARM",
+        "USE_EXACT_ALARM",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "WAKE_LOCK",
+        "VIBRATE",
+        "POST_NOTIFICATIONS",
+        "USE_FULL_SCREEN_INTENT"
+      ]
     }
   }
 }
