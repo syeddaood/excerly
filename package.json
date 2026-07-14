@@ -1,0 +1,20 @@
+{
+  "name": "dawnlock",
+  "private": true,
+  "version": "0.0.1",
+  "description": "DawnLock monorepo — alarm-accountability app",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck:shared": "npm run typecheck -w @dawnlock/shared",
+    "test": "npm run test --workspaces --if-present",
+    "test:shared": "npm run test -w @dawnlock/shared"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10"
+}
