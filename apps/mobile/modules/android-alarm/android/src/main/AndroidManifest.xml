@@ -1,23 +1,33 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-  <!-- Exact alarms (API 31+) and full-screen ringing UI -->
+  <!-- Exact alarms (API 31+) — setExactAndAllowWhileIdle requires one of these -->
   <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
   <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+  <!-- Boot reschedule -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <!-- Foreground ringing service (mediaPlayback) -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-  <uses-permission android:name="android.permission.WAKE_LOCK" />
-  <uses-permission android:name="android.permission.VIBRATE" />
-  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+  <!-- Full-screen intent over lock screen -->
   <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
+  <!-- Keep CPU awake while starting FGS / ringing -->
+  <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+  <!-- Vibration pattern while ringing -->
+  <uses-permission android:name="android.permission.VIBRATE" />
+
+  <!-- High-priority alarm notification (API 33+) -->
+  <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
   <application>
-    <!-- Fires when AlarmManager delivers the exact alarm PendingIntent -->
     <receiver
       android:name=".AlarmReceiver"
       android:exported="false"
       android:enabled="true" />
 
-    <!-- Reschedule exact alarms after device reboot -->
     <receiver
       android:name=".BootReceiver"
       android:exported="true"
@@ -26,25 +36,27 @@
       <intent-filter>
         <action android:name="android.intent.action.BOOT_COMPLETED" />
         <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
         <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+        <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
       </intent-filter>
     </receiver>
 
-    <!-- Foreground service that keeps the alarm ringing until mission success -->
     <service
       android:name=".AlarmRingingService"
       android:exported="false"
-      android:foregroundServiceType="mediaPlayback" />
+      android:foregroundServiceType="mediaPlayback"
+      android:stopWithTask="false" />
 
-    <!-- Full-screen activity launched over the lock screen -->
+    <!-- Lock-screen full-screen ringing shell → deep-links to Expo Router /ring -->
     <activity
       android:name=".AlarmRingingActivity"
       android:exported="false"
       android:excludeFromRecents="true"
-      android:launchMode="singleInstance"
+      android:launchMode="singleTop"
       android:showWhenLocked="true"
       android:turnScreenOn="true"
       android:taskAffinity=""
-      android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+      android:theme="@android:style/Theme.Translucent.NoTitleBar" />
   </application>
 </manifest>

@@ -1,7 +1,17 @@
 import { requireNativeModule, NativeModule } from "expo-modules-core";
 import { Platform } from "react-native";
 
+/**
+ * Typed surface of the Android-only Expo native module.
+ *
+ * Linked only in a custom dev client / prebuild (`npx expo run:android`).
+ * Not available in Expo Go.
+ */
 export type AndroidAlarmNativeModule = {
+  /**
+   * Schedule via AlarmManager.setExactAndAllowWhileIdle (RTC_WAKEUP).
+   * Persists to AlarmStore for BOOT_COMPLETED reschedule.
+   */
   scheduleExactAlarm(
     alarmId: string,
     triggerAtMillis: number,
@@ -9,29 +19,31 @@ export type AndroidAlarmNativeModule = {
     repeatDays: string[],
     missionKind: string
   ): void;
+  /** Cancel a previously scheduled exact alarm and remove it from AlarmStore. */
   cancelAlarm(alarmId: string): void;
+  /**
+   * Whether the app currently holds SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM
+   * privilege (API 31+). Always true on pre-S Android.
+   */
   canScheduleExactAlarms(): boolean;
+  /** Stop the mediaPlayback foreground ringing service. */
   stopRinging(): void;
+  /**
+   * Next stored wall-clock trigger epoch-ms for [alarmId], or -1 if none.
+   * Useful for next-trigger helpers without recomputing from JS.
+   */
+  getStoredTriggerAtMillis(alarmId: string): number;
 };
 
-/**
- * Lazily resolve the native module. Returns null on iOS / when unlinked
- * (e.g. Expo Go) so JS callers can degrade gracefully.
- */
-function loadModule(): AndroidAlarmNativeModule | null {
-  if (Platform.OS !== "android") {
-    return null;
-  }
+let nativeModule: AndroidAlarmNativeModule | null = null;
+
+if (Platform.OS === "android") {
   try {
-    return requireNativeModule<AndroidAlarmNativeModule>("AndroidAlarm");
+    nativeModule = requireNativeModule<AndroidAlarmNativeModule & NativeModule>("AndroidAlarm");
   } catch {
-    return null;
+    // Expo Go / missing prebuild — callers must no-op.
+    nativeModule = null;
   }
 }
 
-const AndroidAlarmModule: AndroidAlarmNativeModule | null = loadModule();
-
-export default AndroidAlarmModule;
-
-// Re-export NativeModule type for consumers that need it.
-export type { NativeModule };
+export default nativeModule;

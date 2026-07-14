@@ -6,8 +6,9 @@ import android.content.Intent
 import android.util.Log
 
 /**
- * Reschedules all persisted exact alarms after the device reboots.
- * Required so AlarmManager entries (which do not survive reboot) are restored.
+ * Reschedules all persisted exact alarms after BOOT_COMPLETED (and related
+ * package-replace events). AlarmStore is SharedPreferences-backed so this
+ * path does not depend on the JS runtime being alive.
  */
 class BootReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent?) {
@@ -15,13 +16,19 @@ class BootReceiver : BroadcastReceiver() {
     if (
       action != Intent.ACTION_BOOT_COMPLETED &&
       action != Intent.ACTION_LOCKED_BOOT_COMPLETED &&
-      action != "android.intent.action.QUICKBOOT_POWERON"
+      action != Intent.ACTION_MY_PACKAGE_REPLACED &&
+      action != "android.intent.action.QUICKBOOT_POWERON" &&
+      action != "com.htc.intent.action.QUICKBOOT_POWERON"
     ) {
       return
     }
 
-    Log.i(TAG, "Boot completed — rescheduling exact alarms")
-    AlarmScheduler.rescheduleAll(context)
+    Log.i(TAG, "Rescheduling exact alarms after $action")
+    try {
+      AlarmScheduler.rescheduleAll(context.applicationContext)
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to reschedule alarms after boot", e)
+    }
   }
 
   companion object {

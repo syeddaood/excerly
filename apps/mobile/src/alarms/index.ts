@@ -7,7 +7,9 @@ export {
   cancelAndroidAlarm,
   rescheduleAllAndroidAlarms,
   canScheduleExactAlarms,
+  getAndroidStoredTriggerAtMillis,
   stopAndroidRinging,
+  isNativeAlarmLinked,
   type SchedulableAlarm,
 } from "./androidAlarmService";
 

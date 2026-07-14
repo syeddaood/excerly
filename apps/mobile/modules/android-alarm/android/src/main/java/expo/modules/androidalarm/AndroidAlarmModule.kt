@@ -10,7 +10,9 @@ import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * Expo native module that schedules exact Android alarms via
- * AlarmManager.setAlarmClock and cancels them by id.
+ * AlarmManager.setExactAndAllowWhileIdle and cancels them by id.
+ *
+ * Requires a custom dev client / prebuild — not available in Expo Go.
  */
 class AndroidAlarmModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -43,12 +45,7 @@ class AndroidAlarmModule : Module() {
     Function("canScheduleExactAlarms") {
       val context = appContext.reactContext
         ?: return@Function false
-      val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        alarmManager.canScheduleExactAlarms()
-      } else {
-        true
-      }
+      AlarmScheduler.canScheduleExactAlarms(context)
     }
 
     Function("stopRinging") {
@@ -56,12 +53,38 @@ class AndroidAlarmModule : Module() {
         ?: throw IllegalStateException("React context is not available")
       AlarmRingingService.stop(context)
     }
+
+    /**
+     * Returns the next wall-clock trigger epoch-ms for a stored alarm id,
+     * or -1 if the id is not currently scheduled in AlarmStore.
+     */
+    Function("getStoredTriggerAtMillis") { alarmId: String ->
+      val context = appContext.reactContext
+        ?: return@Function -1.0
+      val entry = AlarmStore.all(context).firstOrNull { it.alarmId == alarmId }
+      entry?.triggerAtMillis?.toDouble() ?: -1.0
+    }
   }
 }
 
+/**
+ * Schedules / cancels exact RTC_WAKEUP alarms that fire even in Doze.
+ *
+ * Primary API: [AlarmManager.setExactAndAllowWhileIdle] (required by product R2).
+ * SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM must be granted on API 31+.
+ */
 object AlarmScheduler {
   private const val ACTION_FIRE = "com.dawnlock.app.ACTION_ALARM_FIRE"
   private const val DEEP_LINK_SCHEME = "dawnlock"
+
+  fun canScheduleExactAlarms(context: Context): Boolean {
+    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+      alarmManager.canScheduleExactAlarms()
+    } else {
+      true
+    }
+  }
 
   fun schedule(
     context: Context,
@@ -76,22 +99,25 @@ object AlarmScheduler {
     val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
     val pending = buildFirePendingIntent(context, alarmId, label, missionKind)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-      val showIntent = buildRingDeepLinkIntent(context, alarmId, label, missionKind)
-      val showPending = PendingIntent.getActivity(
-        context,
-        requestCodeFor(alarmId) + 100,
-        showIntent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-      )
-      val info = AlarmManager.AlarmClockInfo(triggerAtMillis, showPending)
-      alarmManager.setAlarmClock(info, pending)
-    } else {
+    // Always use setExactAndAllowWhileIdle so alarms fire at wall-clock time
+    // even under Doze / App Standby. Requires SCHEDULE_EXACT_ALARM (API 31+)
+    // or USE_EXACT_ALARM for alarm/clock apps.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        // Still attempt schedule — OS may throw SecurityException; surface via log.
+        android.util.Log.w(
+          "DawnLockAlarmScheduler",
+          "canScheduleExactAlarms=false; setExactAndAllowWhileIdle may fail for id=$alarmId"
+        )
+      }
       alarmManager.setExactAndAllowWhileIdle(
         AlarmManager.RTC_WAKEUP,
         triggerAtMillis,
         pending
       )
+    } else {
+      @Suppress("DEPRECATION")
+      alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerAtMillis, pending)
     }
   }
 
@@ -132,6 +158,7 @@ object AlarmScheduler {
       putExtra(EXTRA_ALARM_ID, alarmId)
       putExtra(EXTRA_LABEL, label)
       putExtra(EXTRA_MISSION_KIND, missionKind)
+      // Unique data URI so PendingIntents for different alarms do not collide.
       data = android.net.Uri.parse("$DEEP_LINK_SCHEME://alarm/$alarmId")
     }
     val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -143,22 +170,33 @@ object AlarmScheduler {
     )
   }
 
+  /**
+   * Deep link into the Expo Router `/ring` route (`dawnlock://ring?alarmId=...`).
+   * Used by AlarmRingingActivity and as a secondary launch path from AlarmReceiver.
+   */
   fun buildRingDeepLinkIntent(
     context: Context,
     alarmId: String,
     label: String,
     missionKind: String
   ): Intent {
-    val uri = android.net.Uri.parse("$DEEP_LINK_SCHEME://ring?alarmId=$alarmId")
+    val uri = android.net.Uri.parse(
+      "$DEEP_LINK_SCHEME://ring?alarmId=${android.net.Uri.encode(alarmId)}"
+    )
     return Intent(Intent.ACTION_VIEW, uri).apply {
       setPackage(context.packageName)
-      addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      addFlags(
+        Intent.FLAG_ACTIVITY_NEW_TASK or
+          Intent.FLAG_ACTIVITY_SINGLE_TOP or
+          Intent.FLAG_ACTIVITY_CLEAR_TOP
+      )
       putExtra(EXTRA_ALARM_ID, alarmId)
       putExtra(EXTRA_LABEL, label)
       putExtra(EXTRA_MISSION_KIND, missionKind)
     }
   }
 
+  /** Stable non-negative request code derived from the alarm id. */
   fun requestCodeFor(alarmId: String): Int {
     return alarmId.hashCode() and 0x7fffffff
   }
