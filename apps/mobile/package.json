@@ -10,7 +10,7 @@
     "android:dev": "expo run:android",
     "ios": "expo run:ios",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx --test src/alarms/engine.test.ts src/missions/math/generator.test.ts"
+    "test": "tsx --test src/alarms/engine.test.ts src/missions/math/generator.test.ts src/missions/missionFramework.test.ts"
   },
   "dependencies": {
     "@dawnlock/shared": "*",

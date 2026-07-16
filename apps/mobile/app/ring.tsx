@@ -1,10 +1,21 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import type { MissionConfig } from "@dawnlock/shared";
 import { useAlarmStore } from "../src/store/alarmStore";
 import { useRingStore } from "../src/store/ringStore";
 import { onAlarmFired, stopAndroidRinging } from "../src/alarms";
-import { MathMission } from "../src/missions";
+import {
+  createMission,
+  resolveMissionComponent,
+  type Mission,
+} from "../src/missions";
+
+const FALLBACK_MISSION: MissionConfig = {
+  kind: "math",
+  difficulty: "easy",
+  count: 3,
+};
 
 function formatClock(now: Date): string {
   return now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -22,9 +33,17 @@ export default function RingScreen() {
   const setMissionStarted = useRingStore((s) => s.setMissionStarted);
   const [clock, setClock] = useState(formatClock(new Date()));
   const [completed, setCompleted] = useState(false);
+  const missionRef = useRef<Mission | null>(null);
 
   const resolvedId = alarmId ?? session?.alarmId;
   const alarm = alarms.find((a) => a.id === resolvedId);
+  const missionConfig: MissionConfig = alarm?.mission ?? FALLBACK_MISSION;
+
+  // Resolve UI via the framework registry — no hard-coded mission kinds here.
+  const MissionView = useMemo(
+    () => resolveMissionComponent(missionConfig.kind),
+    [missionConfig.kind]
+  );
 
   useEffect(() => {
     if (!resolvedId) return;
@@ -55,6 +74,19 @@ export default function RingScreen() {
     setCompleted(true);
   }, [resolvedId, session, recordWakeEvent, clearSession]);
 
+  const handleStartMission = useCallback(() => {
+    const mission = createMission(missionConfig, {
+      onComplete: handleMissionComplete,
+    });
+    missionRef.current = mission;
+    mission?.start();
+    setMissionStarted(true);
+  }, [missionConfig, handleMissionComplete, setMissionStarted]);
+
+  const handleResult = useCallback((success: boolean) => {
+    missionRef.current?.onResult(success);
+  }, []);
+
   if (completed) {
     return (
       <View style={styles.container}>
@@ -67,31 +99,39 @@ export default function RingScreen() {
     );
   }
 
-  if (!alarm) {
+  if (missionStarted && MissionView) {
     return (
       <View style={styles.container}>
-        <Text style={styles.time}>{clock}</Text>
-        <Text style={styles.label}>Alarm ringing</Text>
-        <Text style={styles.hint}>Alarm data not found — complete mission anyway.</Text>
-        {missionStarted ? (
-          <MathMission
-            config={{ kind: "math", difficulty: "easy", count: 3 }}
-            onComplete={handleMissionComplete}
-          />
+        {alarm ? (
+          <Text style={styles.missionHeader}>{alarm.label}</Text>
         ) : (
-          <Pressable style={styles.button} onPress={() => setMissionStarted(true)}>
-            <Text style={styles.buttonText}>Start mission</Text>
-          </Pressable>
+          <>
+            <Text style={styles.time}>{clock}</Text>
+            <Text style={styles.label}>Alarm ringing</Text>
+            <Text style={styles.hint}>
+              Alarm data not found — complete mission anyway.
+            </Text>
+          </>
         )}
+        <MissionView
+          config={missionConfig}
+          onComplete={handleMissionComplete}
+          onResult={handleResult}
+        />
       </View>
     );
   }
 
-  if (missionStarted && alarm.mission.kind === "math") {
+  if (missionStarted && !MissionView) {
     return (
       <View style={styles.container}>
-        <Text style={styles.missionHeader}>{alarm.label}</Text>
-        <MathMission config={alarm.mission} onComplete={handleMissionComplete} />
+        <Text style={styles.label}>Unknown mission type</Text>
+        <Text style={styles.hint}>
+          No mission registered for kind &quot;{missionConfig.kind}&quot;.
+        </Text>
+        <Pressable style={styles.button} onPress={() => router.replace("/")}>
+          <Text style={styles.buttonText}>Back</Text>
+        </Pressable>
       </View>
     );
   }
@@ -100,9 +140,9 @@ export default function RingScreen() {
     <View style={styles.container}>
       <Text style={styles.brand}>DawnLock</Text>
       <Text style={styles.time}>{clock}</Text>
-      <Text style={styles.label}>{alarm.label}</Text>
+      <Text style={styles.label}>{alarm?.label ?? "Alarm ringing"}</Text>
       <Text style={styles.hint}>Complete your mission to dismiss</Text>
-      <Pressable style={styles.button} onPress={() => setMissionStarted(true)}>
+      <Pressable style={styles.button} onPress={handleStartMission}>
         <Text style={styles.buttonText}>Start mission</Text>
       </Pressable>
     </View>
