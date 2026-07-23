@@ -4,6 +4,7 @@ import {
   Text,
   TextInput,
   Button,
+  Pressable,
   StyleSheet,
   ScrollView,
   Switch,
@@ -78,28 +79,49 @@ export function AlarmForm({ initial, submitLabel, onSubmit, onCancel }: AlarmFor
       <Text style={styles.label}>Sound</Text>
       <SoundPicker value={soundId} onChange={setSoundId} />
 
-      <Text style={styles.label}>Math difficulty</Text>
+      <Text style={styles.sectionTitle}>Math mission</Text>
+      <Text style={styles.hint}>
+        Alarm keeps ringing until every problem is solved
+      </Text>
+
+      <Text style={styles.label}>Difficulty</Text>
       <View style={styles.row}>
-        {DIFFICULTIES.map((d) => (
-          <Button
-            key={d}
-            title={d}
-            onPress={() => setDifficulty(d)}
-            color={difficulty === d ? "#1a73e8" : undefined}
-          />
-        ))}
+        {DIFFICULTIES.map((d) => {
+          const selected = difficulty === d;
+          return (
+            <Pressable
+              key={d}
+              onPress={() => setDifficulty(d)}
+              style={[styles.chip, selected && styles.chipSelected]}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                {d}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
-      <Text style={styles.label}>Problems to solve</Text>
+      <Text style={styles.label}>Problems to solve (1–5)</Text>
       <View style={styles.row}>
-        {[1, 2, 3, 4, 5].map((n) => (
-          <Button
-            key={n}
-            title={String(n)}
-            onPress={() => setProblemCount(n)}
-            color={problemCount === n ? "#1a73e8" : undefined}
-          />
-        ))}
+        {[1, 2, 3, 4, 5].map((n) => {
+          const selected = problemCount === n;
+          return (
+            <Pressable
+              key={n}
+              onPress={() => setProblemCount(n)}
+              style={[styles.chip, styles.countChip, selected && styles.chipSelected]}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+            >
+              <Text style={[styles.chipText, selected && styles.chipTextSelected]}>
+                {n}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       <View style={styles.switchRow}>
@@ -117,6 +139,12 @@ export function AlarmForm({ initial, submitLabel, onSubmit, onCancel }: AlarmFor
 const styles = StyleSheet.create({
   container: { padding: 16, paddingBottom: 40 },
   heading: { fontSize: 22, fontWeight: "700", marginBottom: 16 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginTop: 20,
+    marginBottom: 4,
+  },
   label: { fontSize: 14, fontWeight: "600", marginTop: 12, marginBottom: 4 },
   hint: { fontSize: 12, color: "#888" },
   input: {
@@ -127,6 +155,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   row: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginVertical: 8 },
+  chip: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: "#f5f5f5",
+  },
+  countChip: {
+    minWidth: 48,
+    alignItems: "center",
+  },
+  chipSelected: {
+    backgroundColor: "#1a1a1a",
+    borderColor: "#1a1a1a",
+  },
+  chipText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#333",
+    textTransform: "capitalize",
+  },
+  chipTextSelected: {
+    color: "#ffcc00",
+  },
   switchRow: {
     flexDirection: "row",
     justifyContent: "space-between",
