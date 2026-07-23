@@ -3,8 +3,21 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
-      "@/*": ["./*"]
+      "@/*": [
+        "./*"
+      ]
     }
   },
-  "include": ["**/*.ts", "**/*.tsx"]
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "modules/**/src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "modules/**/android",
+    "modules/**/ios"
+  ]
 }

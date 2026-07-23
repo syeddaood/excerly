@@ -31,11 +31,7 @@ export default function EditAlarmScreen() {
             repeatDays: values.repeatDays,
             soundId: values.soundId,
             enabled: values.enabled,
-            mission: {
-              kind: "math",
-              difficulty: values.difficulty,
-              count: values.problemCount,
-            },
+            mission: values.mission,
           });
           router.back();
         }}

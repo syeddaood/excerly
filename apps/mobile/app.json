@@ -8,6 +8,7 @@
     "userInterfaceStyle": "automatic",
     "plugins": [
       "./modules/android-alarm/app.plugin.js",
+      "./modules/image-labeling/app.plugin.js",
       "expo-router",
       "expo-asset",
       "expo-font"
@@ -27,7 +28,8 @@
         "WAKE_LOCK",
         "VIBRATE",
         "POST_NOTIFICATIONS",
-        "USE_FULL_SCREEN_INTENT"
+        "USE_FULL_SCREEN_INTENT",
+        "CAMERA"
       ],
       "intentFilters": [
         {
@@ -38,7 +40,10 @@
               "scheme": "dawnlock"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     }

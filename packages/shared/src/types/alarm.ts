@@ -13,7 +13,34 @@ export type MathMissionConfig = {
   count: number;
 };
 
-export type MissionConfig = MathMissionConfig;
+/**
+ * Single ML Kit image-label entry used as part of an object fingerprint.
+ * Confidences are in [0, 1].
+ */
+export type ObjectLabel = {
+  text: string;
+  confidence: number;
+};
+
+/**
+ * Photo-object mission configuration.
+ * Registration (setup) stores the ML Kit label set as a local "object fingerprint".
+ * Wake-time matching is a separate concern and may be unimplemented.
+ */
+export type PhotoObjectMissionConfig = {
+  kind: "photo_object";
+  /**
+   * Top ML Kit labels from the registration photo (object fingerprint).
+   * Empty until the user photographs a target object during alarm setup.
+   */
+  labels: ObjectLabel[];
+  /** Optional local file URI of the registration photo. */
+  setupPhotoUri?: string;
+  /** Epoch-ms when the fingerprint was captured. */
+  registeredAt?: number;
+};
+
+export type MissionConfig = MathMissionConfig | PhotoObjectMissionConfig;
 
 export type SoundId = "default" | "classic" | "digital" | "gentle";
 
@@ -63,4 +90,19 @@ export function createDefaultAlarm(partial?: Partial<Alarm>): Alarm {
     createdAt: partial?.createdAt ?? now,
     updatedAt: partial?.updatedAt ?? now,
   };
+}
+
+/** Empty photo-object mission config (not yet registered). */
+export function createEmptyPhotoObjectMission(): PhotoObjectMissionConfig {
+  return {
+    kind: "photo_object",
+    labels: [],
+  };
+}
+
+/**
+ * Whether a photo-object mission has a usable local fingerprint.
+ */
+export function isPhotoObjectRegistered(config: PhotoObjectMissionConfig): boolean {
+  return Array.isArray(config.labels) && config.labels.length > 0;
 }
