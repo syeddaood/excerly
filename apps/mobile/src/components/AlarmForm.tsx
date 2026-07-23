@@ -31,7 +31,11 @@ type AlarmFormProps = {
   onCancel?: () => void;
 };
 
-const DIFFICULTIES: MathDifficulty[] = ["easy", "medium", "hard"];
+const DIFFICULTIES: { id: MathDifficulty; title: string; hint: string }[] = [
+  { id: "easy", title: "Easy", hint: "Single-digit + / −" },
+  { id: "medium", title: "Medium", hint: "Two-digit ×" },
+  { id: "hard", title: "Hard", hint: "Mixed three-operand" },
+];
 
 export function AlarmForm({ initial, submitLabel, onSubmit, onCancel }: AlarmFormProps) {
   const defaults = createDefaultAlarm(initial);
@@ -40,8 +44,12 @@ export function AlarmForm({ initial, submitLabel, onSubmit, onCancel }: AlarmFor
   const [repeatDays, setRepeatDays] = useState<Weekday[]>(defaults.repeatDays);
   const [soundId, setSoundId] = useState<SoundId>(defaults.soundId);
   const [enabled, setEnabled] = useState(defaults.enabled);
-  const [difficulty, setDifficulty] = useState<MathDifficulty>(defaults.mission.difficulty);
-  const [problemCount, setProblemCount] = useState(defaults.mission.count);
+  const mission =
+    defaults.mission?.kind === "math"
+      ? defaults.mission
+      : { kind: "math" as const, difficulty: "easy" as MathDifficulty, count: 1 };
+  const [difficulty, setDifficulty] = useState<MathDifficulty>(mission.difficulty);
+  const [problemCount, setProblemCount] = useState(mission.count);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = () => {
@@ -61,6 +69,8 @@ export function AlarmForm({ initial, submitLabel, onSubmit, onCancel }: AlarmFor
     });
   };
 
+  const selectedDifficulty = DIFFICULTIES.find((d) => d.id === difficulty);
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.heading}>{submitLabel}</Text>
@@ -78,19 +88,25 @@ export function AlarmForm({ initial, submitLabel, onSubmit, onCancel }: AlarmFor
       <Text style={styles.label}>Sound</Text>
       <SoundPicker value={soundId} onChange={setSoundId} />
 
+      <Text style={styles.label}>Mission</Text>
+      <Text style={styles.hint}>Math problems (stop the alarm by solving)</Text>
+
       <Text style={styles.label}>Math difficulty</Text>
       <View style={styles.row}>
         {DIFFICULTIES.map((d) => (
           <Button
-            key={d}
-            title={d}
-            onPress={() => setDifficulty(d)}
-            color={difficulty === d ? "#1a73e8" : undefined}
+            key={d.id}
+            title={d.title}
+            onPress={() => setDifficulty(d.id)}
+            color={difficulty === d.id ? "#1a73e8" : undefined}
           />
         ))}
       </View>
+      {selectedDifficulty ? (
+        <Text style={styles.hint}>{selectedDifficulty.hint}</Text>
+      ) : null}
 
-      <Text style={styles.label}>Problems to solve</Text>
+      <Text style={styles.label}>Problems to solve (1–5)</Text>
       <View style={styles.row}>
         {[1, 2, 3, 4, 5].map((n) => (
           <Button
