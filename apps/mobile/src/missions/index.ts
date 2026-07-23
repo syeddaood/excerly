@@ -6,17 +6,14 @@
 import "./registerBuiltins";
 
 export { MathMission } from "./math/MathMission";
-export { generateMathProblem } from "./math/generator";
+export { MathMissionSession } from "./math/MathMissionSession";
+export {
+  generateMathProblem,
+  clampProblemCount,
+  isValidDifficulty,
+} from "./math/generator";
+export type { MathProblem } from "./math/generator";
 export type { MissionProps, MissionDefinition } from "./types";
-
-export type {
-  Mission,
-  MissionContext,
-  MissionComponent,
-  MissionComponentProps,
-  MissionTypeDescriptor,
-} from "./missionFramework";
-
 export {
   BaseMission,
   ComponentBackedMission,
@@ -25,4 +22,11 @@ export {
   listMissionTypes,
   registerMissionType,
   resolveMissionComponent,
+} from "./missionFramework";
+export type {
+  Mission,
+  MissionContext,
+  MissionComponentProps,
+  MissionComponent,
+  MissionTypeDescriptor,
 } from "./missionFramework";

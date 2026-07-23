@@ -3,26 +3,28 @@
  * Import this module once (from missions/index) so the registry is populated
  * before the ring screen resolves components.
  *
- * Adding a new mission type:
- *   1. Implement a React component matching MissionComponentProps
- *   2. Call registerMissionType({ kind, label, create, Component })
- *   3. Do NOT change the alarm / ring flow
+ * Adding a new mission type = register here + implement Mission + Component.
  */
 
-import type { MissionConfig } from "@dawnlock/shared";
+import type { MathMissionConfig } from "@dawnlock/shared";
+import { registerMissionType } from "./missionFramework";
 import { MathMission } from "./math/MathMission";
-import {
-  ComponentBackedMission,
-  registerMissionType,
-  type MissionContext,
-} from "./missionFramework";
+import { MathMissionSession } from "./math/MathMissionSession";
 
-registerMissionType({
-  kind: "math",
-  label: "Math problems",
-  create: (_config: MissionConfig, context: MissionContext) =>
-    new ComponentBackedMission(context),
-  // MathMission accepts MathMissionConfig; MissionConfig is currently only math.
-  // Cast keeps the registry generic without coupling the framework to math.
-  Component: MathMission as unknown as import("./missionFramework").MissionComponent,
-});
+let registered = false;
+
+export function registerBuiltinMissions(): void {
+  if (registered) return;
+  registered = true;
+
+  registerMissionType({
+    kind: "math",
+    label: "Math problems",
+    create: (config, context) =>
+      new MathMissionSession(config as MathMissionConfig, context),
+    Component: MathMission,
+  });
+}
+
+// Auto-register on import so app entry only needs to import the missions barrel.
+registerBuiltinMissions();

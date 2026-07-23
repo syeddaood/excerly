@@ -33,10 +33,10 @@ function makeContext(): MissionContext & {
 
 class TestMission extends BaseMission {
   readonly maxAttempts = 3;
-  started = false;
+  didStart = false;
 
   protected onStart(): void {
-    this.started = true;
+    this.didStart = true;
   }
 }
 
@@ -49,7 +49,7 @@ describe("Mission interface + BaseMission", () => {
     assert.equal(typeof mission.onResult, "function");
 
     mission.start();
-    assert.equal((mission as TestMission).started, true);
+    assert.equal((mission as TestMission).didStart, true);
 
     mission.onResult(true);
     assert.equal(ctx.completeCalls, 1);
@@ -73,7 +73,7 @@ describe("Mission interface + BaseMission", () => {
     const mission = new TestMission(ctx);
     mission.start();
     mission.start();
-    assert.equal((mission as TestMission).started, true);
+    assert.equal((mission as TestMission).didStart, true);
   });
 });
 
@@ -107,7 +107,7 @@ describe("mission registry framework", () => {
 
     const ctx = makeContext();
     // MissionConfig is currently only math; cast for registry isolation test.
-    const mission = createMission({ kind } as MissionConfig, ctx);
+    const mission = createMission({ kind } as unknown as MissionConfig, ctx);
     assert.ok(mission);
     mission!.start();
     mission!.onResult(true);
@@ -117,7 +117,7 @@ describe("mission registry framework", () => {
   it("createMission returns null for unknown kinds", () => {
     const ctx = makeContext();
     const mission = createMission(
-      { kind: "does_not_exist_xyz" } as MissionConfig,
+      { kind: "does_not_exist_xyz" } as unknown as MissionConfig,
       ctx
     );
     assert.equal(mission, null);
