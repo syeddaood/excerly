@@ -8,6 +8,8 @@ export type {
   MathDifficulty,
   MathMissionConfig,
   MissionConfig,
+  ObjectLabel,
+  PhotoObjectMissionConfig,
   SoundId,
   WakeEvent,
   Weekday,
@@ -16,7 +18,9 @@ export type {
 export {
   WEEKDAYS,
   createDefaultAlarm,
+  createEmptyPhotoObjectMission,
   formatAlarmLabel,
+  isPhotoObjectRegistered,
 } from "./types/alarm";
 
 export {

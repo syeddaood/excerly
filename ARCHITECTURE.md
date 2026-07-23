@@ -86,3 +86,24 @@ npm run typecheck -w @dawnlock/mobile
 ## Product context (from README)
 
 DawnLock is a cross-platform alarm-accountability app: alarms dismiss only after a completed mission (photo object, math, steps, …). This document describes **repo structure** and the Android exact-alarm firing path (issue #10).
+
+## Photo-object mission registration (issue #16)
+
+Users register a target object during alarm create/edit. On-device ML Kit labels the photo; the label set is stored locally on the alarm's `mission` config.
+
+| Piece | Role |
+|-------|------|
+| `packages/shared` `PhotoObjectMissionConfig` / `ObjectLabel` | Fingerprint types on `Alarm.mission` |
+| `apps/mobile/modules/image-labeling` (`dawnlock-image-labeling`) | Native camera capture + Google ML Kit image labeling (Android) |
+| `src/missions/photoObject/labelService.ts` | JS wrapper + Expo Go mock fallback |
+| `src/missions/photoObject/PhotoObjectRegistration.tsx` | Setup UI embedded in `AlarmForm` |
+| `src/missions/photoObject/PhotoObjectMission.tsx` | Wake-time stub (execution out of scope) |
+| `src/missions/registerBuiltins.ts` | Registers `photo_object` mission kind |
+| `src/components/AlarmForm.tsx` | Mission type picker + registration gate |
+
+**Setup path:** Alarm form → Photograph object → ML Kit labels → persist `{ kind: "photo_object", labels, setupPhotoUri, registeredAt }` on the alarm via the existing local store.
+
+Requires a **dev client / prebuild** for real ML Kit (`npx expo run:android`). Without the native module, a development mock labeler keeps the UI exercisable.
+
+Wake-time photo verification is **not** implemented here.
+

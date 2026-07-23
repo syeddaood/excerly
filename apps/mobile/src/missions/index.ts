@@ -7,6 +7,17 @@ import "./registerBuiltins";
 
 export { MathMission } from "./math/MathMission";
 export { generateMathProblem } from "./math/generator";
+export { PhotoObjectMission } from "./photoObject/PhotoObjectMission";
+export { PhotoObjectRegistration } from "./photoObject/PhotoObjectRegistration";
+export {
+  applyCaptureToMission,
+  buildPhotoObjectMissionConfig,
+  captureTargetObject,
+  isMlKitAvailable,
+  labelTargetImage,
+  normalizeLabels,
+} from "./photoObject/labelService";
+export type { LabelCaptureResult } from "./photoObject/fingerprint";
 export type { MissionProps, MissionDefinition } from "./types";
 
 export type {
