@@ -34,6 +34,8 @@ export default function RingScreen() {
   const [clock, setClock] = useState(formatClock(new Date()));
   const [completed, setCompleted] = useState(false);
   const missionRef = useRef<Mission | null>(null);
+  /** Guards against double-complete from mission session + UI both firing. */
+  const completedRef = useRef(false);
 
   const resolvedId = alarmId ?? session?.alarmId;
   const alarm = alarms.find((a) => a.id === resolvedId);
@@ -61,7 +63,10 @@ export default function RingScreen() {
   }, []);
 
   const handleMissionComplete = useCallback(() => {
+    // Alarm stays ringing until this runs — and only once all N problems are solved.
+    if (completedRef.current) return;
     if (!resolvedId) return;
+    completedRef.current = true;
     stopAndroidRinging();
     recordWakeEvent({
       id: `wake_${Date.now()}`,

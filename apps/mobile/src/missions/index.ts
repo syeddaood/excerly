@@ -6,7 +6,14 @@
 import "./registerBuiltins";
 
 export { MathMission } from "./math/MathMission";
+export { MathMissionSession } from "./math/MathMissionSession";
 export { generateMathProblem } from "./math/generator";
+export {
+  clampProblemCount,
+  startMathProgress,
+  submitMathAnswer,
+} from "./math/progress";
+export type { MathMissionProgress, MathAnswerResult } from "./math/progress";
 export type { MissionProps, MissionDefinition } from "./types";
 
 export type {

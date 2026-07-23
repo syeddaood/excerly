@@ -33,10 +33,10 @@ function makeContext(): MissionContext & {
 
 class TestMission extends BaseMission {
   readonly maxAttempts = 3;
-  started = false;
+  startCount = 0;
 
   protected onStart(): void {
-    this.started = true;
+    this.startCount += 1;
   }
 }
 
@@ -49,7 +49,7 @@ describe("Mission interface + BaseMission", () => {
     assert.equal(typeof mission.onResult, "function");
 
     mission.start();
-    assert.equal((mission as TestMission).started, true);
+    assert.equal((mission as TestMission).startCount, 1);
 
     mission.onResult(true);
     assert.equal(ctx.completeCalls, 1);
@@ -73,7 +73,7 @@ describe("Mission interface + BaseMission", () => {
     const mission = new TestMission(ctx);
     mission.start();
     mission.start();
-    assert.equal((mission as TestMission).started, true);
+    assert.equal((mission as TestMission).startCount, 1);
   });
 });
 
@@ -117,10 +117,40 @@ describe("mission registry framework", () => {
   it("createMission returns null for unknown kinds", () => {
     const ctx = makeContext();
     const mission = createMission(
-      { kind: "does_not_exist_xyz" } as MissionConfig,
+      { kind: "does_not_exist_xyz" } as unknown as MissionConfig,
       ctx
     );
     assert.equal(mission, null);
+  });
+
+  it("math mission session via registry requires N successes before complete", () => {
+    // Register without importing the RN MathMission component (node test runner).
+    const { MathMissionSession } = require("./math/MathMissionSession") as typeof import("./math/MathMissionSession");
+    const mathKind = `math_n_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    registerMissionType({
+      kind: mathKind,
+      label: "Math problems",
+      create: (config, context) =>
+        new MathMissionSession(
+          config as import("@dawnlock/shared").MathMissionConfig,
+          context
+        ),
+      Component: FakeComponent,
+    });
+
+    const ctx = makeContext();
+    const mission = createMission(
+      { kind: mathKind, difficulty: "easy", count: 2 } as MissionConfig,
+      ctx
+    );
+    assert.ok(mission);
+    mission!.start();
+    mission!.onResult(true);
+    assert.equal(ctx.completeCalls, 0, "first correct must not dismiss alarm");
+    mission!.onResult(false);
+    assert.equal(ctx.completeCalls, 0, "wrong answer must not dismiss alarm");
+    mission!.onResult(true);
+    assert.equal(ctx.completeCalls, 1, "N-th correct dismisses alarm");
   });
 
   it("rejects duplicate registration", () => {
