@@ -18,8 +18,8 @@ export default function NewAlarmScreen() {
           enabled: values.enabled,
           mission: {
             kind: "math",
-            difficulty: values.difficulty,
-            count: values.problemCount,
+            difficulty: values.missionDifficulty,
+            count: values.missionCount,
           },
         });
         router.back();

@@ -44,14 +44,15 @@ export type MissionContext = {
 // React UI bridge (missions render as components on the ring screen)
 // ---------------------------------------------------------------------------
 
-export type MissionComponentProps = {
-  config: MissionConfig;
+export type MissionComponentProps<C extends MissionConfig = MissionConfig> = {
+  config: C;
   onComplete: () => void;
   /** Optional per-attempt callback; maps to Mission.onResult. */
   onResult?: (success: boolean) => void;
 };
 
-export type MissionComponent = ComponentType<MissionComponentProps>;
+export type MissionComponent<C extends MissionConfig = MissionConfig> =
+  ComponentType<MissionComponentProps<C>>;
 
 // ---------------------------------------------------------------------------
 // Type registration
@@ -61,13 +62,13 @@ export type MissionComponent = ComponentType<MissionComponentProps>;
  * Descriptor for a registered mission type.
  * `create` builds an imperative Mission; `Component` is the ring-screen UI.
  */
-export type MissionTypeDescriptor = {
+export type MissionTypeDescriptor<C extends MissionConfig = MissionConfig> = {
   kind: string;
   label: string;
   /** Factory that produces a Mission instance for the given config + context. */
-  create: (config: MissionConfig, context: MissionContext) => Mission;
+  create: (config: C, context: MissionContext) => Mission;
   /** React component rendered while the mission is active. */
-  Component: MissionComponent;
+  Component: MissionComponent<C>;
 };
 
 const registry = new Map<string, MissionTypeDescriptor>();
